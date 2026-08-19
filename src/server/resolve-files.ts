@@ -82,3 +82,35 @@ export function resolveFiles(args: string[]): ResolvedFile[] {
   files.sort(speckitSort);
   return files;
 }
+
+/**
+ * The directory a review session's .review.json/.review-images live in:
+ * the first argument itself if it's a directory, otherwise the directory
+ * containing the first resolved file.
+ */
+export function resolveOutputDir(
+  fileArgs: string[],
+  files: ResolvedFile[],
+): string {
+  const firstArg = path.resolve(fileArgs[0]);
+  return fs.statSync(firstArg).isDirectory()
+    ? firstArg
+    : path.dirname(files[0].path);
+}
+
+/**
+ * Rewrites each file's relativePath to be relative to outputDir instead of
+ * whatever per-argument convention resolveFiles used. This is what gets
+ * saved into .review.json and matched back up on --restore, so it needs to
+ * be stable no matter whether the CLI was invoked with a directory or with
+ * individual file paths pointing at the same files.
+ */
+export function relativizeToOutputDir(
+  files: ResolvedFile[],
+  outputDir: string,
+): ResolvedFile[] {
+  return files.map((file) => ({
+    ...file,
+    relativePath: path.relative(outputDir, file.path),
+  }));
+}

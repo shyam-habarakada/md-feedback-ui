@@ -21,7 +21,7 @@ Browser-based markdown review UI with inline commenting and screenshot support. 
 npx md-feedback-ui ./docs/plan.md
 ```
 
-This opens a browser-based review UI. Add comments inline, attach screenshots, and click Submit. The tool writes a `.review.json` file next to the input and exits.
+This opens a browser-based review UI. Add comments inline, attach screenshots, and click Submit. The tool writes a `.review.json` file and exits — see [Where Review Files Are Written](#where-review-files-are-written) for exactly where.
 
 ## Claude Code Integration
 
@@ -81,6 +81,25 @@ Submit). Restored comments are matched back to their markdown block by file
 and line range — if that block was edited or removed since the comment was
 left, the comment is silently dropped rather than shown as orphaned.
 
+## Where Review Files Are Written
+
+`.review.json` and `.review-images/` (if any screenshots were attached) are
+written based on how you invoked the CLI, not your current working
+directory:
+
+- **Directory argument** — written inside that directory.
+  `md-feedback-ui docs/` → `docs/.review.json`
+- **File argument(s)** — written into the directory containing the first
+  file path given.
+  `md-feedback-ui docs/plan.md` → `docs/.review.json`
+  `md-feedback-ui docs/spec.md docs/plan.md docs/tasks.md` → `docs/.review.json`
+
+This is also where `--restore` looks for a previous session's
+`.review.json`. You can point at the directory on one run and at individual
+files inside it on the next (or vice versa) — comments are matched back up
+by file and line range relative to that directory, not by which argument
+style the CLI happened to be invoked with.
+
 ## Output Format
 
 The `.review.json` file contains structured feedback:
@@ -102,6 +121,21 @@ The `.review.json` file contains structured feedback:
   ]
 }
 ```
+
+## .gitignore
+
+As covered above, `.review.json` and `.review-images/` can end up anywhere
+in your repo depending on how the CLI was invoked. Add these two lines to
+your repo's root `.gitignore` so they never get committed no matter where a
+review was run from:
+
+```gitignore
+.review.json
+.review-images/
+```
+
+Leaving off the leading `/` is what makes these match at any depth in the
+tree, not just the repo root.
 
 ## Development
 

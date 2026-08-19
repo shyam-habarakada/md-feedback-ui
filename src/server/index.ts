@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import cors from "cors";
 import open from "open";
-import { resolveFiles } from "./resolve-files.js";
+import {
+  resolveFiles,
+  resolveOutputDir,
+  relativizeToOutputDir,
+} from "./resolve-files.js";
 import { registerRoutes } from "./routes.js";
 import {
   parseArgs,
@@ -31,14 +35,13 @@ if (flags.has("--install-skill")) {
   process.exit(0);
 }
 
-const files = resolveFiles(fileArgs);
-
-// Determine outputDir: if input was a directory, use it; otherwise use the
-// directory of the first file.
-const firstArg = path.resolve(fileArgs[0]);
-const outputDir = fs.statSync(firstArg).isDirectory()
-  ? firstArg
-  : path.dirname(files[0].path);
+const resolvedFiles = resolveFiles(fileArgs);
+const outputDir = resolveOutputDir(fileArgs, resolvedFiles);
+// relativePath must be anchored to outputDir (where .review.json lives),
+// not to however each file happened to be resolved, so that a saved
+// review's file references still match on a later --restore regardless of
+// whether the CLI was invoked with a directory or individual file paths.
+const files = relativizeToOutputDir(resolvedFiles, outputDir);
 
 const app = express();
 app.use(cors());

@@ -3,7 +3,11 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { resolveFiles } from "../resolve-files.js";
+import {
+  resolveFiles,
+  resolveOutputDir,
+  relativizeToOutputDir,
+} from "../resolve-files.js";
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "resolve-files-test-"));
@@ -117,5 +121,92 @@ describe("resolveFiles", () => {
     const result = resolveFiles([subDir]);
 
     expect(result[0].relativePath).toBe("042-feature/plan.md");
+  });
+});
+
+describe("resolveOutputDir", () => {
+  it("uses the directory itself when the first arg is a directory", () => {
+    const dir = createTmpDir();
+    fs.writeFileSync(path.join(dir, "plan.md"), "plan");
+
+    const files = resolveFiles([dir]);
+    expect(resolveOutputDir([dir], files)).toBe(dir);
+  });
+
+  it("uses the containing directory when the first arg is a file", () => {
+    const dir = createTmpDir();
+    const filePath = path.join(dir, "plan.md");
+    fs.writeFileSync(filePath, "plan");
+
+    const files = resolveFiles([filePath]);
+    expect(resolveOutputDir([filePath], files)).toBe(dir);
+  });
+
+  it("resolves to the same outputDir whether invoked with the directory or the file directly", () => {
+    const dir = createTmpDir();
+    const filePath = path.join(dir, "plan.md");
+    fs.writeFileSync(filePath, "plan");
+
+    const viaDir = resolveOutputDir([dir], resolveFiles([dir]));
+    const viaFile = resolveOutputDir([filePath], resolveFiles([filePath]));
+
+    expect(viaDir).toBe(viaFile);
+  });
+});
+
+describe("relativizeToOutputDir", () => {
+  it("rewrites relativePath relative to outputDir", () => {
+    const dir = createTmpDir();
+    const filePath = path.join(dir, "plan.md");
+    fs.writeFileSync(filePath, "plan");
+
+    const files = resolveFiles([dir]);
+    const result = relativizeToOutputDir(files, dir);
+
+    expect(result[0].relativePath).toBe("plan.md");
+  });
+
+  it("produces the same relativePath regardless of whether the CLI was invoked with the directory or the file directly", () => {
+    // Regression test: previously resolveFiles alone produced "plan.md" for
+    // a file arg but "docs/plan.md" for a directory arg pointing at the
+    // same file, which broke matching saved comments back up on --restore
+    // whenever the invocation style differed between the submit run and
+    // the restore run.
+    const dir = createTmpDir();
+    const filePath = path.join(dir, "plan.md");
+    fs.writeFileSync(filePath, "plan");
+
+    const outputDirViaDir = resolveOutputDir([dir], resolveFiles([dir]));
+    const viaDir = relativizeToOutputDir(
+      resolveFiles([dir]),
+      outputDirViaDir,
+    );
+
+    const outputDirViaFile = resolveOutputDir(
+      [filePath],
+      resolveFiles([filePath]),
+    );
+    const viaFile = relativizeToOutputDir(
+      resolveFiles([filePath]),
+      outputDirViaFile,
+    );
+
+    expect(viaDir[0].relativePath).toBe("plan.md");
+    expect(viaFile[0].relativePath).toBe("plan.md");
+    expect(viaDir[0].relativePath).toBe(viaFile[0].relativePath);
+  });
+
+  it("does not mutate the original ResolvedFile objects", () => {
+    const dir = createTmpDir();
+    const subDir = path.join(dir, "sub");
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, "plan.md"), "plan");
+
+    const files = resolveFiles([subDir]);
+    const original = files[0].relativePath;
+
+    relativizeToOutputDir(files, subDir);
+
+    expect(files[0].relativePath).toBe(original);
   });
 });
