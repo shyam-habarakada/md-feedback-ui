@@ -320,7 +320,7 @@ body {
   background: #ddf4ff;
   padding: 2px 8px;
   border-radius: 12px;
-  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .comment-thread__quote {
@@ -343,6 +343,40 @@ body {
   border: none;
   cursor: pointer;
   margin-right: 8px;
+}
+
+.comment-thread--collapsed {
+  padding: 6px 14px;
+}
+
+.comment-thread__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-thread:not(.comment-thread--collapsed) .comment-thread__header {
+  margin-bottom: 8px;
+}
+
+.comment-thread__summary-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #656d76;
+}
+
+.comment-thread__toggle {
+  font-size: 12px;
+  color: #0969da;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-left: auto;
 }
 
 .comment-thread__thumbnails {

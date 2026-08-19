@@ -12,6 +12,12 @@ Pass either file paths or a directory as arguments: $ARGUMENTS
 npx md-feedback-ui $ARGUMENTS
 ```
 
+   If a `.review.json` from an earlier, interrupted session already exists next to these files (e.g. the server was closed before the user clicked Submit), add `--restore` to reload those comments into the browser instead of starting from a blank slate:
+
+   ```bash
+   npx md-feedback-ui $ARGUMENTS --restore
+   ```
+
 2. After the command exits, read the `.review.json` file that was written next to the input files. It contains structured feedback with file paths, source line references, selected text, comments, and optional screenshot image paths.
 
 3. Process each comment in order, grouped by file. For each comment:

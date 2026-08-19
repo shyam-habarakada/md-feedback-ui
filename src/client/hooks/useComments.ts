@@ -4,6 +4,7 @@ import type { ActiveCommentForm, Comment } from "../types";
 export function useComments(): {
   comments: Map<string, Comment[]>;
   activeForm: ActiveCommentForm | null;
+  expandedCommentIds: Set<string>;
   getCommentsForFile: (filePath: string) => Comment[];
   getCommentCount: () => number;
   showCommentForm: (form: Omit<ActiveCommentForm, "editingId">) => void;
@@ -11,9 +12,44 @@ export function useComments(): {
   addComment: (text: string, screenshots?: File[]) => void;
   deleteComment: (filePath: string, id: string) => void;
   startEditing: (filePath: string, id: string) => void;
+  restoreComments: (restored: Map<string, Comment[]>) => void;
+  expandComment: (id: string) => void;
+  collapseComment: (id: string) => void;
+  toggleCommentExpanded: (id: string) => void;
 } {
   const [comments, setComments] = useState<Map<string, Comment[]>>(new Map());
   const [activeForm, setActiveForm] = useState<ActiveCommentForm | null>(null);
+  const [expandedCommentIds, setExpandedCommentIds] = useState<Set<string>>(
+    new Set(),
+  );
+
+  const expandComment = useCallback((id: string) => {
+    setExpandedCommentIds((prev) => {
+      if (prev.has(id)) return prev;
+      return new Set(prev).add(id);
+    });
+  }, []);
+
+  const collapseComment = useCallback((id: string) => {
+    setExpandedCommentIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const toggleCommentExpanded = useCallback((id: string) => {
+    setExpandedCommentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
   const getCommentsForFile = useCallback(
     (filePath: string): Comment[] => {
@@ -38,8 +74,11 @@ export function useComments(): {
   );
 
   const cancelComment = useCallback(() => {
+    if (activeForm?.editingId) {
+      collapseComment(activeForm.editingId);
+    }
     setActiveForm(null);
-  }, []);
+  }, [activeForm, collapseComment]);
 
   const addComment = useCallback(
     (text: string, screenshots?: File[]) => {
@@ -59,6 +98,9 @@ export function useComments(): {
           );
           return next;
         });
+        // A saved comment always collapses, whether it was expanded before
+        // the edit began or not.
+        collapseComment(activeForm.editingId);
       } else {
         const newComment: Comment = {
           id: crypto.randomUUID(),
@@ -81,20 +123,35 @@ export function useComments(): {
 
       setActiveForm(null);
     },
-    [activeForm],
+    [activeForm, collapseComment],
   );
 
-  const deleteComment = useCallback((filePath: string, id: string) => {
+  const deleteComment = useCallback(
+    (filePath: string, id: string) => {
+      setComments((prev) => {
+        const next = new Map(prev);
+        const fileComments = next.get(filePath);
+        if (fileComments) {
+          const filtered = fileComments.filter((c) => c.id !== id);
+          if (filtered.length === 0) {
+            next.delete(filePath);
+          } else {
+            next.set(filePath, filtered);
+          }
+        }
+        return next;
+      });
+      collapseComment(id);
+    },
+    [collapseComment],
+  );
+
+  const restoreComments = useCallback((restored: Map<string, Comment[]>) => {
     setComments((prev) => {
       const next = new Map(prev);
-      const fileComments = next.get(filePath);
-      if (fileComments) {
-        const filtered = fileComments.filter((c) => c.id !== id);
-        if (filtered.length === 0) {
-          next.delete(filePath);
-        } else {
-          next.set(filePath, filtered);
-        }
+      for (const [filePath, restoredList] of restored) {
+        const existing = next.get(filePath) ?? [];
+        next.set(filePath, [...existing, ...restoredList]);
       }
       return next;
     });
@@ -123,6 +180,7 @@ export function useComments(): {
   return {
     comments,
     activeForm,
+    expandedCommentIds,
     getCommentsForFile,
     getCommentCount,
     showCommentForm,
@@ -130,5 +188,9 @@ export function useComments(): {
     addComment,
     deleteComment,
     startEditing,
+    restoreComments,
+    expandComment,
+    collapseComment,
+    toggleCommentExpanded,
   };
 }

@@ -314,4 +314,187 @@ describe("useComments", () => {
       "test.png",
     );
   });
+
+  it("a newly added comment starts out not expanded", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.showCommentForm(formA);
+    });
+    act(() => {
+      result.current.addComment("Fresh comment");
+    });
+
+    const comment = result.current.getCommentsForFile("fileA.md")[0];
+    expect(result.current.expandedCommentIds.has(comment.id)).toBe(false);
+  });
+
+  it("expandComment adds the id to expandedCommentIds", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.expandComment("some-id");
+    });
+
+    expect(result.current.expandedCommentIds.has("some-id")).toBe(true);
+  });
+
+  it("toggleCommentExpanded flips membership in expandedCommentIds", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.toggleCommentExpanded("some-id");
+    });
+    expect(result.current.expandedCommentIds.has("some-id")).toBe(true);
+
+    act(() => {
+      result.current.toggleCommentExpanded("some-id");
+    });
+    expect(result.current.expandedCommentIds.has("some-id")).toBe(false);
+  });
+
+  it("saving an edit collapses the comment even if it was expanded beforehand", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.showCommentForm(formA);
+    });
+    act(() => {
+      result.current.addComment("Original");
+    });
+
+    const comment = result.current.getCommentsForFile("fileA.md")[0];
+
+    act(() => {
+      result.current.expandComment(comment.id);
+    });
+    expect(result.current.expandedCommentIds.has(comment.id)).toBe(true);
+
+    act(() => {
+      result.current.startEditing("fileA.md", comment.id);
+    });
+    act(() => {
+      result.current.addComment("Edited");
+    });
+
+    expect(result.current.expandedCommentIds.has(comment.id)).toBe(false);
+  });
+
+  it("canceling an edit collapses the comment being edited", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.showCommentForm(formA);
+    });
+    act(() => {
+      result.current.addComment("Original");
+    });
+
+    const comment = result.current.getCommentsForFile("fileA.md")[0];
+
+    act(() => {
+      result.current.expandComment(comment.id);
+    });
+    act(() => {
+      result.current.startEditing("fileA.md", comment.id);
+    });
+    act(() => {
+      result.current.cancelComment();
+    });
+
+    expect(result.current.expandedCommentIds.has(comment.id)).toBe(false);
+  });
+
+  it("restoreComments merges restored comments into an empty state", () => {
+    const { result } = renderHook(() => useComments());
+
+    const restored = new Map([
+      [
+        "fileA.md",
+        [
+          {
+            id: "restored-1",
+            filePath: "fileA.md",
+            startLine: 1,
+            endLine: 1,
+            blockType: "heading",
+            selectedText: "Title",
+            comment: "Restored comment",
+            screenshots: [],
+          },
+        ],
+      ],
+    ]);
+
+    act(() => {
+      result.current.restoreComments(restored);
+    });
+
+    const comments = result.current.getCommentsForFile("fileA.md");
+    expect(comments).toHaveLength(1);
+    expect(comments[0].comment).toBe("Restored comment");
+    expect(result.current.getCommentCount()).toBe(1);
+  });
+
+  it("restoreComments appends to, rather than replaces, existing comments for a file", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.showCommentForm(formA);
+    });
+    act(() => {
+      result.current.addComment("Live comment");
+    });
+
+    const restored = new Map([
+      [
+        "fileA.md",
+        [
+          {
+            id: "restored-1",
+            filePath: "fileA.md",
+            startLine: 10,
+            endLine: 10,
+            blockType: "paragraph",
+            selectedText: "Other block",
+            comment: "Restored comment",
+            screenshots: [],
+          },
+        ],
+      ],
+    ]);
+
+    act(() => {
+      result.current.restoreComments(restored);
+    });
+
+    const comments = result.current.getCommentsForFile("fileA.md");
+    expect(comments).toHaveLength(2);
+    expect(comments.map((c) => c.comment)).toEqual([
+      "Live comment",
+      "Restored comment",
+    ]);
+  });
+
+  it("deleteComment removes the id from expandedCommentIds", () => {
+    const { result } = renderHook(() => useComments());
+
+    act(() => {
+      result.current.showCommentForm(formA);
+    });
+    act(() => {
+      result.current.addComment("Original");
+    });
+
+    const comment = result.current.getCommentsForFile("fileA.md")[0];
+
+    act(() => {
+      result.current.expandComment(comment.id);
+    });
+    act(() => {
+      result.current.deleteComment("fileA.md", comment.id);
+    });
+
+    expect(result.current.expandedCommentIds.has(comment.id)).toBe(false);
+  });
 });

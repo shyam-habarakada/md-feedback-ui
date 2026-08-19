@@ -6,6 +6,7 @@ import { CommentThread } from "./CommentThread";
 export interface CommentableBlockContextValue {
   comments: Comment[];
   activeForm: ActiveCommentForm | null;
+  expandedCommentIds: Set<string>;
   onAddComment: (block: {
     startLine: number;
     endLine: number;
@@ -16,6 +17,7 @@ export interface CommentableBlockContextValue {
   onCommentCancel: () => void;
   onEditComment: (id: string) => void;
   onDeleteComment: (id: string) => void;
+  onToggleCommentExpanded: (id: string) => void;
 }
 
 export const CommentableBlockContext =
@@ -42,11 +44,13 @@ export function CommentableBlock({
   const {
     comments,
     activeForm,
+    expandedCommentIds,
     onAddComment,
     onCommentSubmit,
     onCommentCancel,
     onEditComment,
     onDeleteComment,
+    onToggleCommentExpanded,
   } = ctx;
 
   const matchingComments = comments.filter(
@@ -92,6 +96,8 @@ export function CommentableBlock({
           <CommentThread
             key={comment.id}
             comment={comment}
+            expanded={expandedCommentIds.has(comment.id)}
+            onToggleExpanded={() => onToggleCommentExpanded(comment.id)}
             onEdit={onEditComment}
             onDelete={onDeleteComment}
           />

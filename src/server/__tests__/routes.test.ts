@@ -19,7 +19,11 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function createApp(files: ResolvedFile[], outputDir?: string) {
+function createApp(
+  files: ResolvedFile[],
+  outputDir?: string,
+  enableRestore = true,
+) {
   const app = express();
   app.use(express.json());
   const server = http.createServer(app);
@@ -34,7 +38,7 @@ function createApp(files: ResolvedFile[], outputDir?: string) {
     return server;
   });
 
-  registerRoutes(app, files, dir, server);
+  registerRoutes(app, files, dir, server, enableRestore);
 
   return { app, server, mockExit, mockClose, cleanup: () => {
     mockExit.mockRestore();
@@ -178,6 +182,134 @@ describe("POST /api/submit", () => {
     expect(written.comments[1].screenshots).toHaveLength(1);
     expect(written.comments[1].screenshots[0]).toMatch(/\.review-images\//);
     expect(fs.existsSync(written.comments[1].screenshots[0])).toBe(true);
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("GET /api/review", () => {
+  it("returns review: null when no .review.json exists", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-get-"));
+    const { app, cleanup } = createApp([], outDir);
+
+    const res = await request(app).get("/api/review").expect(200);
+
+    expect(res.body).toEqual({ review: null });
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+
+  it("returns the parsed contents of an existing .review.json", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-get2-"));
+    const reviewPayload = {
+      reviewedFiles: ["/tmp/spec.md"],
+      submittedAt: "2026-03-29T12:00:00.000Z",
+      comments: [
+        {
+          file: "spec.md",
+          startLine: 1,
+          endLine: 1,
+          blockType: "heading",
+          selectedText: "Title",
+          comment: "Needs work",
+          screenshots: [],
+        },
+      ],
+    };
+    fs.writeFileSync(
+      path.join(outDir, ".review.json"),
+      JSON.stringify(reviewPayload),
+    );
+    const { app, cleanup } = createApp([], outDir);
+
+    const res = await request(app).get("/api/review").expect(200);
+
+    expect(res.body.review).toEqual(reviewPayload);
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+
+  it("returns review: null when .review.json contains invalid JSON", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-get3-"));
+    fs.writeFileSync(path.join(outDir, ".review.json"), "{not valid json");
+    const { app, cleanup } = createApp([], outDir);
+
+    const res = await request(app).get("/api/review").expect(200);
+
+    expect(res.body).toEqual({ review: null });
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("GET /api/review-images/:filename", () => {
+  it("serves a saved screenshot with a sniffed image content type", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-img-"));
+    const imageDir = path.join(outDir, ".review-images");
+    fs.mkdirSync(imageDir, { recursive: true });
+    const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+    fs.writeFileSync(path.join(imageDir, "abc123"), pngBytes);
+    const { app, cleanup } = createApp([], outDir);
+
+    const res = await request(app)
+      .get("/api/review-images/abc123")
+      .expect(200);
+
+    expect(res.headers["content-type"]).toBe("image/png");
+    expect(Buffer.compare(res.body, pngBytes)).toBe(0);
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+
+  it("returns 404 for a missing screenshot", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-img2-"));
+    const { app, cleanup } = createApp([], outDir);
+
+    await request(app).get("/api/review-images/does-not-exist").expect(404);
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+
+  it("does not allow path traversal outside the image directory", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-img3-"));
+    fs.mkdirSync(path.join(outDir, ".review-images"), { recursive: true });
+    const secretPath = path.join(outDir, "secret.txt");
+    fs.writeFileSync(secretPath, "top secret");
+    const { app, cleanup } = createApp([], outDir);
+
+    const res = await request(app).get(
+      "/api/review-images/..%2Fsecret.txt",
+    );
+
+    expect(res.status).toBe(404);
+
+    cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  });
+});
+
+describe("restore routes gated behind enableRestore", () => {
+  it("404s on /api/review and /api/review-images/:filename when restore is disabled", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "review-disabled-"));
+    const reviewPayload = { comments: [] };
+    fs.writeFileSync(
+      path.join(outDir, ".review.json"),
+      JSON.stringify(reviewPayload),
+    );
+    const imageDir = path.join(outDir, ".review-images");
+    fs.mkdirSync(imageDir, { recursive: true });
+    fs.writeFileSync(path.join(imageDir, "abc123"), Buffer.from("fake-png"));
+
+    const { app, cleanup } = createApp([], outDir, false);
+
+    await request(app).get("/api/review").expect(404);
+    await request(app).get("/api/review-images/abc123").expect(404);
 
     cleanup();
     fs.rmSync(outDir, { recursive: true, force: true });

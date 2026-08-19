@@ -17,12 +17,14 @@ const noopSubmit = vi.fn();
 const noopCancel = vi.fn();
 const noopEdit = vi.fn();
 const noopDelete = vi.fn();
+const noopToggleExpanded = vi.fn();
 
 function renderMarkdown(
   content: string,
   options: {
     comments?: Comment[];
     activeForm?: ActiveCommentForm | null;
+    expandedCommentIds?: Set<string>;
   } = {},
 ) {
   return render(
@@ -30,11 +32,13 @@ function renderMarkdown(
       content={content}
       comments={options.comments ?? []}
       activeForm={options.activeForm ?? null}
+      expandedCommentIds={options.expandedCommentIds ?? new Set()}
       onAddComment={noopAdd}
       onCommentSubmit={noopSubmit}
       onCommentCancel={noopCancel}
       onEditComment={noopEdit}
       onDeleteComment={noopDelete}
+      onToggleCommentExpanded={noopToggleExpanded}
     />,
   );
 }

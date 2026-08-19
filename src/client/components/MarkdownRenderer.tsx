@@ -14,6 +14,7 @@ interface MarkdownRendererProps {
   content: string;
   comments: Comment[];
   activeForm: ActiveCommentForm | null;
+  expandedCommentIds: Set<string>;
   onAddComment: (block: {
     startLine: number;
     endLine: number;
@@ -24,6 +25,7 @@ interface MarkdownRendererProps {
   onCommentCancel: () => void;
   onEditComment: (id: string) => void;
   onDeleteComment: (id: string) => void;
+  onToggleCommentExpanded: (id: string) => void;
 }
 
 function extractText(children: ReactNode): string {
@@ -152,30 +154,36 @@ export function MarkdownRenderer({
   content,
   comments,
   activeForm,
+  expandedCommentIds,
   onAddComment,
   onCommentSubmit,
   onCommentCancel,
   onEditComment,
   onDeleteComment,
+  onToggleCommentExpanded,
 }: MarkdownRendererProps) {
   const ctxValue: CommentableBlockContextValue = useMemo(
     () => ({
       comments,
       activeForm,
+      expandedCommentIds,
       onAddComment,
       onCommentSubmit,
       onCommentCancel,
       onEditComment,
       onDeleteComment,
+      onToggleCommentExpanded,
     }),
     [
       comments,
       activeForm,
+      expandedCommentIds,
       onAddComment,
       onCommentSubmit,
       onCommentCancel,
       onEditComment,
       onDeleteComment,
+      onToggleCommentExpanded,
     ],
   );
 

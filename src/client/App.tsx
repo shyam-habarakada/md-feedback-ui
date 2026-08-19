@@ -1,6 +1,7 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useReviewFiles } from "./hooks/useReviewFiles";
 import { useComments } from "./hooks/useComments";
+import { restoreReviewComments } from "./restore-review";
 import { FileTabBar } from "./components/FileTabBar";
 import { MarkdownRenderer } from "./components/MarkdownRenderer";
 import { ReviewSidebar } from "./components/ReviewSidebar";
@@ -13,6 +14,7 @@ export function App() {
   const {
     comments,
     activeForm,
+    expandedCommentIds,
     getCommentsForFile,
     getCommentCount,
     showCommentForm,
@@ -20,10 +22,23 @@ export function App() {
     addComment,
     deleteComment,
     startEditing,
+    restoreComments,
+    expandComment,
+    toggleCommentExpanded,
   } = useComments();
 
   const [submitted, setSubmitted] = useState(false);
   const [outputPath, setOutputPath] = useState<string | null>(null);
+
+  const hasRestoredRef = useRef(false);
+  useEffect(() => {
+    if (files.length === 0 || hasRestoredRef.current) return;
+    hasRestoredRef.current = true;
+
+    restoreReviewComments(files).then((restored) => {
+      if (restored.size > 0) restoreComments(restored);
+    });
+  }, [files, restoreComments]);
 
   const activeFile = files[activeIndex] ?? null;
 
@@ -82,12 +97,21 @@ export function App() {
     [activeFile, deleteComment],
   );
 
-  const handleScrollToComment = useCallback((commentId: string) => {
-    const el = document.querySelector(`[data-comment-id="${commentId}"]`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-  }, []);
+  const handleScrollToComment = useCallback(
+    (commentId: string) => {
+      expandComment(commentId);
+      // Defer to the next frame so the expand re-render has already
+      // committed — otherwise scrollIntoView centers on the shorter,
+      // still-collapsed card and the expanded content ends up off-center.
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-comment-id="${commentId}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    },
+    [expandComment],
+  );
 
   const handleSubmitReview = useCallback(async () => {
     // Build the submission payload
@@ -185,11 +209,13 @@ export function App() {
               activeForm={
                 activeForm?.filePath === activeFile.path ? activeForm : null
               }
+              expandedCommentIds={expandedCommentIds}
               onAddComment={handleAddComment}
               onCommentSubmit={handleCommentSubmit}
               onCommentCancel={handleCommentCancel}
               onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}
+              onToggleCommentExpanded={toggleCommentExpanded}
             />
           )}
         </main>

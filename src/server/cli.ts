@@ -66,6 +66,7 @@ Usage:
   md-feedback-ui --install-skill [--global]
 
 Options:
+  --restore          Reload comments left in a previous session's .review.json
   --no-open          Don't auto-open the browser
   --install-skill    Install the Claude Code skill to .claude/commands/
   --global           With --install-skill, install to ~/.claude/commands/
@@ -76,6 +77,7 @@ Examples:
   md-feedback-ui plan.md
   md-feedback-ui docs/
   md-feedback-ui spec.md plan.md tasks.md
+  md-feedback-ui docs/ --restore
   md-feedback-ui --install-skill
   md-feedback-ui --install-skill --global`);
 }

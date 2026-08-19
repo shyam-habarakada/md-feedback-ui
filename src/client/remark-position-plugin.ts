@@ -1,7 +1,7 @@
 import { visit } from "unist-util-visit";
 import type { Root, RootContent } from "mdast";
 
-const BLOCK_TYPES = new Set([
+export const BLOCK_TYPES = new Set([
   "heading",
   "paragraph",
   "code",

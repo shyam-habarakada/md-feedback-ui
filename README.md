@@ -8,9 +8,11 @@ Browser-based markdown review UI with inline commenting and screenshot support. 
 
 - GitHub-flavored Markdown rendering with Mermaid diagram support
 - Inline block-level commenting on any markdown element
+- Comment threads collapse to a one-line summary after saving, and expand again from the thread itself or by clicking the comment in the sidebar
 - Screenshot attachments via paste or drag-and-drop
 - Multi-file tabs with speckit ordering (spec, plan, tasks, then alphabetical)
 - Structured JSON output (`.review.json`) for automation
+- Optionally reload comments left in a previous session with `--restore`
 - Zero-config: `npx` and go
 
 ## Quick Start
@@ -54,6 +56,7 @@ md-feedback-ui --install-skill [--global]
 
 | Option | Description |
 |--------|-------------|
+| `--restore` | Reload comments left in a previous session's `.review.json` |
 | `--no-open` | Don't auto-open the browser |
 | `--install-skill` | Install the Claude Code skill to `.claude/commands/` |
 | `--global` | With `--install-skill`, install to `~/.claude/commands/` |
@@ -66,7 +69,17 @@ md-feedback-ui --install-skill [--global]
 md-feedback-ui plan.md                    # Single file
 md-feedback-ui docs/                      # All .md files in directory
 md-feedback-ui spec.md plan.md tasks.md   # Multiple files
+md-feedback-ui docs/ --restore            # Resume, reloading prior comments
 ```
+
+### Resuming a review
+
+By default each run starts from a blank slate. Pass `--restore` to reload
+comments from a `.review.json` left by a previous session in the same
+directory (for example, if the server was closed before you clicked
+Submit). Restored comments are matched back to their markdown block by file
+and line range — if that block was edited or removed since the comment was
+left, the comment is silently dropped rather than shown as orphaned.
 
 ## Output Format
 

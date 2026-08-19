@@ -73,4 +73,4 @@ server.on("error", (err: NodeJS.ErrnoException) => {
   throw err;
 });
 
-registerRoutes(app, files, outputDir, server);
+registerRoutes(app, files, outputDir, server, flags.has("--restore"));

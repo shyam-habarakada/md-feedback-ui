@@ -21,18 +21,64 @@ interface ReviewPayload {
   comments: ReviewComment[];
 }
 
+const IMAGE_SIGNATURES: Array<{ type: string; magic: number[] }> = [
+  { type: "image/png", magic: [0x89, 0x50, 0x4e, 0x47] },
+  { type: "image/jpeg", magic: [0xff, 0xd8, 0xff] },
+  { type: "image/gif", magic: [0x47, 0x49, 0x46, 0x38] },
+  { type: "image/webp", magic: [0x52, 0x49, 0x46, 0x46] },
+];
+
+function sniffImageType(buffer: Buffer): string {
+  for (const { type, magic } of IMAGE_SIGNATURES) {
+    if (magic.every((byte, i) => buffer[i] === byte)) return type;
+  }
+  return "application/octet-stream";
+}
+
 export function registerRoutes(
   app: Express,
   files: ResolvedFile[],
   outputDir: string,
   server: Server,
+  enableRestore: boolean,
 ): void {
   const imageDir = path.join(outputDir, ".review-images");
   const upload = multer({ dest: imageDir });
+  const reviewPath = path.join(outputDir, ".review.json");
 
   app.get("/api/files", (_req, res) => {
     res.json({ files });
   });
+
+  if (enableRestore) {
+    app.get("/api/review", (_req, res) => {
+      if (!fs.existsSync(reviewPath)) {
+        res.json({ review: null });
+        return;
+      }
+
+      try {
+        const review = JSON.parse(fs.readFileSync(reviewPath, "utf-8"));
+        res.json({ review });
+      } catch {
+        res.json({ review: null });
+      }
+    });
+
+    app.get("/api/review-images/:filename", (req, res) => {
+      const filename = path.basename(req.params.filename);
+      const filePath = path.join(imageDir, filename);
+
+      if (!fs.existsSync(filePath)) {
+        res.status(404).end();
+        return;
+      }
+
+      const buffer = fs.readFileSync(filePath);
+      res.setHeader("Content-Type", sniffImageType(buffer));
+      res.send(buffer);
+    });
+  }
 
   app.post("/api/submit", upload.any(), (req, res) => {
     const reviewJson = (req as unknown as { body: Record<string, string> }).body

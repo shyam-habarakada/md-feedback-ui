@@ -26,11 +26,13 @@ function makeComment(overrides: Partial<Comment> = {}): Comment {
 const defaultCtx = {
   comments: [] as Comment[],
   activeForm: null as ActiveCommentForm | null,
+  expandedCommentIds: new Set<string>(),
   onAddComment: vi.fn(),
   onCommentSubmit: vi.fn(),
   onCommentCancel: vi.fn(),
   onEditComment: vi.fn(),
   onDeleteComment: vi.fn(),
+  onToggleCommentExpanded: vi.fn(),
 };
 
 function renderBlock(
@@ -103,6 +105,26 @@ describe("CommentableBlock", () => {
     renderBlock({ activeForm });
 
     expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("expands a matching CommentThread when its id is in expandedCommentIds", () => {
+    const comments = [
+      makeComment({ id: "c1", selectedText: "The quote", comment: "A comment" }),
+    ];
+    renderBlock({ comments, expandedCommentIds: new Set(["c1"]) });
+
+    expect(screen.getByText("The quote")).toBeInTheDocument();
+    expect(screen.getByText("Collapse")).toBeInTheDocument();
+  });
+
+  it("clicking the toggle calls onToggleCommentExpanded with the comment id", async () => {
+    const onToggleCommentExpanded = vi.fn();
+    const user = userEvent.setup();
+    const comments = [makeComment({ id: "c1" })];
+    renderBlock({ comments, onToggleCommentExpanded });
+
+    await user.click(screen.getByText("Expand"));
+    expect(onToggleCommentExpanded).toHaveBeenCalledWith("c1");
   });
 
   it("replaces CommentThread with CommentForm when editing that comment", () => {
